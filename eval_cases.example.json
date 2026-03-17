@@ -1,0 +1,42 @@
+{
+  "cases": [
+    {
+      "name": "AI-heavy Telegram bot",
+      "repo_url": "https://github.com/whereisnomu/anonymous-questions-tg-bot",
+      "mode": "full",
+      "ai_probability_min": 25,
+      "ai_probability_max": 70,
+      "required_issue_markers": [
+        "тест",
+        "ошиб"
+      ],
+      "banned_issue_markers": [
+        "xss",
+        "csrf",
+        "обрезан"
+      ],
+      "banned_signal_markers": [
+        "xss",
+        "csrf"
+      ],
+      "banned_summary_markers": [
+        "okay, let's start",
+        "the user wants me"
+      ]
+    },
+    {
+      "name": "Tiny beginner HTML repo",
+      "repo_url": "https://github.com/dereddd/artur2",
+      "mode": "heuristic",
+      "expected_source_contains": "Эвристика",
+      "ai_probability_max": 25,
+      "required_issue_markers": [
+        "readme"
+      ],
+      "banned_summary_markers": [
+        "xss",
+        "csrf"
+      ]
+    }
+  ]
+}

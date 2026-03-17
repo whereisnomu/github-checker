@@ -548,21 +548,28 @@ def process_repository_review(
         result = reviewer.review(snapshot, heuristic, progress_callback=publish_status)
         publish_status("Проверка завершена. Отправляю итоговый отчет...")
         report = render_report_v2(snapshot, result)
-        telegram.send_message(
-            chat_id,
-            report,
-            disable_web_page_preview=True,
-            reply_to_message_id=message_id,
-        )
+        if status_message_id:
+            try:
+                telegram.edit_message(
+                    chat_id,
+                    status_message_id,
+                    report,
+                    disable_web_page_preview=True,
+                )
+                return
+            except Exception:  # noqa: BLE001
+                logger.exception("Failed to replace status message with final report")
+        telegram.send_message(chat_id, report, disable_web_page_preview=True, reply_to_message_id=message_id)
     except ValueError as exc:
         publish_status("Не удалось запустить проверку: ссылка или данные проекта не подошли.")
         telegram.send_message(chat_id, html.escape(str(exc)), reply_to_message_id=message_id)
     except HTTPError as exc:
         publish_status("GitHub вернул ошибку при загрузке репозитория.")
         logger.exception("GitHub request failed")
+        status_code = exc.response.status_code if exc.response is not None else "unknown"
         telegram.send_message(
             chat_id,
-            f"Не получилось скачать репозиторий с GitHub: {exc.response.status_code}.",
+            f"Не получилось скачать репозиторий с GitHub. Код ответа: {status_code}. Попробуйте повторить запрос чуть позже.",
             reply_to_message_id=message_id,
         )
     except requests.ConnectionError:
@@ -1105,6 +1112,12 @@ class GitHubClient:
 
         raise ValueError("Не удалось определить ветку репозитория для скачивания.")
 
+    def archive_urls(self, owner: str, repo: str, branch: str) -> list[str]:
+        return [
+            f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{branch}",
+            f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip",
+        ]
+
     def extract_branch_from_html(self, repo_page: str) -> str | None:
         patterns = (
             r'"defaultBranch":"([^"]+)"',
@@ -1120,12 +1133,24 @@ class GitHubClient:
         return None
 
     def archive_exists(self, owner: str, repo: str, branch: str) -> bool:
-        response = self.session.head(
-            f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{branch}",
-            timeout=20,
-            allow_redirects=True,
-        )
-        return response.status_code == 200
+        for url in self.archive_urls(owner, repo, branch):
+            try:
+                response = self.session.head(url, timeout=20, allow_redirects=True)
+            except requests.RequestException:
+                continue
+            if response.status_code == 200:
+                return True
+            if response.status_code in {400, 403, 405}:
+                try:
+                    probe = self.session.get(url, timeout=20, allow_redirects=True, stream=True)
+                except requests.RequestException:
+                    continue
+                try:
+                    if probe.status_code == 200:
+                        return True
+                finally:
+                    probe.close()
+        return False
 
     def extract_description(self, repo_page: str) -> str:
         match = re.search(r'<meta name="description" content="([^"]+)"', repo_page)
@@ -1140,12 +1165,19 @@ class GitHubClient:
         return description
 
     def download_archive(self, owner: str, repo: str, branch: str) -> bytes:
-        response = self.session.get(
-            f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{branch}",
-            timeout=60,
-        )
-        response.raise_for_status()
-        return response.content
+        last_error: HTTPError | None = None
+        for url in self.archive_urls(owner, repo, branch):
+            response = self.session.get(url, timeout=60, allow_redirects=True)
+            if response.status_code == 200:
+                return response.content
+            try:
+                response.raise_for_status()
+            except HTTPError as exc:
+                last_error = exc
+                continue
+        if last_error is not None:
+            raise last_error
+        raise ValueError("Не удалось скачать архив репозитория с GitHub.")
 
     def extract_files(self, archive_bytes: bytes) -> tuple[list[RepoFile], int]:
         files: list[RepoFile] = []
