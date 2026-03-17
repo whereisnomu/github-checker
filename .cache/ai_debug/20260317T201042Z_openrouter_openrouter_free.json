@@ -1,0 +1,91 @@
+{
+  "timestamp_utc": "20260317T201042Z",
+  "provider_key": "openrouter:openrouter/free",
+  "status": "success",
+  "prompt": "Ты проверяешь репозиторий студента-новичка. Будь доброжелательным, но строгим. Сделай самостоятельный разбор по реальным файлам проекта. Не пересказывай локальную эвристику и не выдумывай отсутствующие детали.\n\nПроверь прежде всего входные точки, конфиг, README, основные модули, самые крупные файлы и все, что влияет на пользовательский сценарий. Если приложено ТЗ, сравни проект с ним и явно отметь, что покрыто, а что выглядит недоделанным или отсутствующим.\n\nИспользуй признаки возможной AI-генерации:\n- слишком академичный стиль;\n- избыточные и очевидные комментарии;\n- шаблонный или громоздкий нейминг;\n- логическая стерильность и повторы;\n- устаревшие конструкции для современного проекта;\n- слабая обработка ошибок и edge cases;\n- отсутствие следов живой разработки и ручной эволюции.\n\nРезультат должен быть конкретным, по файлам и признакам. Не больше 3 сильных сторон, 5 проблем, 4 рекомендаций, 6 пунктов детального разбора и 5 AI-сигналов. Верни только JSON без Markdown по схеме:\n{\"summary\":\"string\",\"strengths\":[\"string\"],\"issues\":[{\"title\":\"string\",\"detail\":\"string\",\"severity\":\"low|medium|high\"}],\"recommendations\":[\"string\"],\"detailed_analysis\":[\"string\"],\"ai_detection_signals\":[\"string\"],\"reviewed_files\":[\"string\"],\"assignment_summary\":\"string\",\"assignment_findings\":[\"string\"],\"ai_probability_percent\":0,\"ai_rationale\":[\"string\"],\"overall_score_percent\":0}\n\nREPO: dereddd/artur2\nDESCRIPTION: Contribute to dereddd/artur2 development by creating an account on GitHub.\nDEFAULT_BRANCH: main\nFILES_ANALYZED: 1\nFILES_SKIPPED: 0\n\nREVIEWED_FILES:\n\n\nFILES:\n- artru2/index.html\n\nREADME:\nREADME отсутствует\n\nCODE_SAMPLES:",
+  "response_text": "{\"summary\":\"The repository lacks essential documentation and structure, with only a single HTML file present. Missing README and incomplete project setup indicate potential AI-generated content or minimal effort.\",\"strengths\":[\"Basic HTML syntax validity (if present)\",\"Single-file simplicity may suit very basic projects\",\"No obvious syntax errors in the analyzed file\"],\"issues\":[{\"title\":\"Missing README\",\"detail\":\"No project description, setup instructions, or usage guidance provided. Critical for onboarding and understanding the project's purpose.\",\"severity\":\"high\"},{\"title\":\"Incomplete project structure\",\"detail\":\"Only one file (index.html) exists. Real projects typically include CSS, JS, and backend components for functionality.\",\"severity\":\"high\"},{\"title\":null}]}",
+  "response_json": {
+    "id": "gen-1773778183-qMIlQ69xzGZeBTDiEGF8",
+    "object": "chat.completion",
+    "created": 1773778183,
+    "model": "nvidia/nemotron-nano-9b-v2:free",
+    "provider": "Nvidia",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "length",
+        "native_finish_reason": "length",
+        "message": {
+          "role": "assistant",
+          "content": "{\"summary\":\"The repository lacks essential documentation and structure, with only a single HTML file present. Missing README and incomplete project setup indicate potential AI-generated content or minimal effort.\",\"strengths\":[\"Basic HTML syntax validity (if present)\",\"Single-file simplicity may suit very basic projects\",\"No obvious syntax errors in the analyzed file\"],\"issues\":[{\"title\":\"Missing README\",\"detail\":\"No project description, setup instructions, or usage guidance provided. Critical for onboarding and understanding the project's purpose.\",\"severity\":\"high\"},{\"title\":\"Incomplete project structure\",\"detail\":\"Only one file (index.html) exists. Real projects typically include CSS, JS, and backend components for functionality.\",\"severity\":\"high\"},{\"title\":null}]}",
+          "refusal": null,
+          "reasoning": "Okay, let's tackle this review. The user provided a repo called dereddd/artur2, which is a beginner's project. The main file analyzed is artru2/index.html. The README is missing, which is a big issue. \n\nFirst, I need to check the entry points. Since there's only an HTML file, maybe the entry point is index.html. But without a README, it's hard to know the project's purpose. The user mentioned checking the README first, so that's a problem.\n\nNext, the code sample. The HTML file might be very basic. If it's a simple page without any interactivity or structure, that's a sign of possible AI generation. Maybe the HTML is too simple, with no real functionality. Also, if there are too many comments or generic names, that's another AI signal.\n\nLooking at the files analyzed, only index.html is there. That's a red flag because a real project would have more files like CSS, JS, maybe a backend. The absence of other files could indicate a lack of development or AI-generated minimal code.\n\nFor strengths, maybe the HTML is valid syntax, but that's not a strong point. The user wants up to 3 strengths. Maybe the file exists, but that's too basic. Alternatively, if there's any structure, but without seeing the code, it's hard to tell.\n\nIssues: Missing README is a high severity. No other files, which is a problem. If the HTML is too simple or has AI signs like generic comments, that's medium or high. Also, no error handling if there's any JS, but since it's just HTML, maybe not applicable. The project might not meet the assignment if there's a TZ, but the user didn't mention one here.\n\nRecommendations: Add a README, create more files for a complete project, add documentation, improve code structure, handle edge cases.\n\nDetailed analysis would need to look at the HTML content. If it's a single page with no real content or structure, that's an issue. If comments are excessive or obvious, that's another.\n\nAI detection signals: Missing README is a sign. If the HTML has no real purpose, maybe AI-generated. Also, if the code is too simple or follows a template.\n\nOverall, the JSON needs to be structured with all these points. Need to make sure the severity levels are correct. The AI probability might be high if there are multiple signals. The assignment summary would note the missing README and incomplete project.\n",
+          "reasoning_details": [
+            {
+              "type": "reasoning.text",
+              "text": "Okay, let's tackle this review. The user provided a repo called dereddd/artur2, which is a beginner's project. The main file analyzed is artru2/index.html. The README is missing, which is a big issue. \n\nFirst, I need to check the entry points. Since there's only an HTML file, maybe the entry point is index.html. But without a README, it's hard to know the project's purpose. The user mentioned checking the README first, so that's a problem.\n\nNext, the code sample. The HTML file might be very basic. If it's a simple page without any interactivity or structure, that's a sign of possible AI generation. Maybe the HTML is too simple, with no real functionality. Also, if there are too many comments or generic names, that's another AI signal.\n\nLooking at the files analyzed, only index.html is there. That's a red flag because a real project would have more files like CSS, JS, maybe a backend. The absence of other files could indicate a lack of development or AI-generated minimal code.\n\nFor strengths, maybe the HTML is valid syntax, but that's not a strong point. The user wants up to 3 strengths. Maybe the file exists, but that's too basic. Alternatively, if there's any structure, but without seeing the code, it's hard to tell.\n\nIssues: Missing README is a high severity. No other files, which is a problem. If the HTML is too simple or has AI signs like generic comments, that's medium or high. Also, no error handling if there's any JS, but since it's just HTML, maybe not applicable. The project might not meet the assignment if there's a TZ, but the user didn't mention one here.\n\nRecommendations: Add a README, create more files for a complete project, add documentation, improve code structure, handle edge cases.\n\nDetailed analysis would need to look at the HTML content. If it's a single page with no real content or structure, that's an issue. If comments are excessive or obvious, that's another.\n\nAI detection signals: Missing README is a sign. If the HTML has no real purpose, maybe AI-generated. Also, if the code is too simple or follows a template.\n\nOverall, the JSON needs to be structured with all these points. Need to make sure the severity levels are correct. The AI probability might be high if there are multiple signals. The assignment summary would note the missing README and incomplete project.\n",
+              "format": "unknown",
+              "index": 0
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 527,
+      "completion_tokens": 700,
+      "total_tokens": 1227,
+      "cost": 0,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0,
+        "upstream_inference_prompt_cost": 0,
+        "upstream_inference_completions_cost": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 597,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    }
+  },
+  "parsed_payload": {
+    "summary": "The repository lacks essential documentation and structure, with only a single HTML file present. Missing README and incomplete project setup indicate potential AI-generated content or minimal effort.",
+    "strengths": [
+      "Basic HTML syntax validity (if present)",
+      "Single-file simplicity may suit very basic projects",
+      "No obvious syntax errors in the analyzed file"
+    ],
+    "issues": [
+      {
+        "title": "Missing README",
+        "detail": "No project description, setup instructions, or usage guidance provided. Critical for onboarding and understanding the project's purpose.",
+        "severity": "high"
+      },
+      {
+        "title": "Incomplete project structure",
+        "detail": "Only one file (index.html) exists. Real projects typically include CSS, JS, and backend components for functionality.",
+        "severity": "high"
+      },
+      {
+        "title": null
+      }
+    ]
+  },
+  "error": "",
+  "usage": {
+    "prompt_tokens": 527,
+    "completion_tokens": 700,
+    "cached_tokens": 0,
+    "total_tokens": 1227,
+    "estimated_cost_usd": 0.0
+  }
+}

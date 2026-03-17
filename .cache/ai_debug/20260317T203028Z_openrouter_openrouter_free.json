@@ -1,0 +1,34 @@
+{
+  "timestamp_utc": "20260317T203028Z",
+  "provider_key": "openrouter:openrouter/free",
+  "status": "success",
+  "prompt": "Ты проверяешь репозиторий студента-новичка. Будь доброжелательным, но строгим. Сделай самостоятельный разбор по реальным файлам проекта. Не пересказывай локальную эвристику и не выдумывай отсутствующие детали.\n\nПроверь прежде всего входные точки, конфиг, README, основные модули, самые крупные файлы и все, что влияет на пользовательский сценарий. Если приложено ТЗ, сравни проект с ним и явно отметь, что покрыто, а что выглядит недоделанным или отсутствующим.\n\nИспользуй признаки возможной AI-генерации:\n- слишком академичный стиль;\n- избыточные и очевидные комментарии;\n- шаблонный или громоздкий нейминг;\n- логическая стерильность и повторы;\n- устаревшие конструкции для современного проекта;\n- слабая обработка ошибок и edge cases;\n- отсутствие следов живой разработки и ручной эволюции.\n\nРезультат должен быть конкретным, по файлам и признакам. Не больше 3 сильных сторон, 5 проблем, 4 рекомендаций, 6 пунктов детального разбора и 5 AI-сигналов. Верни только JSON без Markdown по схеме:\n{\"summary\":\"string\",\"strengths\":[\"string\"],\"issues\":[{\"title\":\"string\",\"detail\":\"string\",\"severity\":\"low|medium|high\"}],\"recommendations\":[\"string\"],\"detailed_analysis\":[\"string\"],\"ai_detection_signals\":[\"string\"],\"reviewed_files\":[\"string\"],\"assignment_summary\":\"string\",\"assignment_findings\":[\"string\"],\"ai_probability_percent\":0,\"ai_rationale\":[\"string\"],\"overall_score_percent\":0}\n\nREPO: o/n\nDESCRIPTION: нет описания\nDEFAULT_BRANCH: main\nFILES_ANALYZED: 0\nFILES_SKIPPED: 0\n\nREVIEWED_FILES:\n\n\nFILES:\n\n\nREADME:\nREADME отсутствует\n\nCODE_SAMPLES:",
+  "response_text": "{}",
+  "response_json": {
+    "try": 2
+  },
+  "parsed_payload": {
+    "summary": "good",
+    "strengths": [
+      "s"
+    ],
+    "issues": [
+      {
+        "title": "i",
+        "detail": "d",
+        "severity": "medium"
+      }
+    ],
+    "recommendations": [
+      "r"
+    ]
+  },
+  "error": "",
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 5,
+    "cached_tokens": 0,
+    "total_tokens": 15,
+    "estimated_cost_usd": 0.0
+  }
+}

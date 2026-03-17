@@ -1,0 +1,30 @@
+{
+  "days": {
+    "2026-03-17": {
+      "tokens": 123690,
+      "cost_usd": 0.0,
+      "calls": 33,
+      "providers": {
+        "openrouter:openrouter/free": {
+          "tokens": 123690,
+          "cost_usd": 0.0,
+          "calls": 33
+        }
+      }
+    }
+  },
+  "months": {
+    "2026-03": {
+      "tokens": 123690,
+      "cost_usd": 0.0,
+      "calls": 33,
+      "providers": {
+        "openrouter:openrouter/free": {
+          "tokens": 123690,
+          "cost_usd": 0.0,
+          "calls": 33
+        }
+      }
+    }
+  }
+}

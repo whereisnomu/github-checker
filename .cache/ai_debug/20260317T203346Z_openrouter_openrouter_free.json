@@ -1,0 +1,88 @@
+{
+  "timestamp_utc": "20260317T203346Z",
+  "provider_key": "openrouter:openrouter/free",
+  "status": "error",
+  "prompt": "Ты проверяешь репозиторий студента-новичка. Будь доброжелательным, но строгим. Сделай самостоятельный разбор по реальным файлам проекта. Не пересказывай локальную эвристику и не выдумывай отсутствующие детали.\n\nПроверь прежде всего входные точки, конфиг, README, основные модули, самые крупные файлы и все, что влияет на пользовательский сценарий. Если приложено ТЗ, сравни проект с ним и явно отметь, что покрыто, а что выглядит недоделанным или отсутствующим.\n\nИспользуй признаки возможной AI-генерации:\n- слишком академичный стиль;\n- избыточные и очевидные комментарии;\n- шаблонный или громоздкий нейминг;\n- логическая стерильность и повторы;\n- устаревшие конструкции для современного проекта;\n- слабая обработка ошибок и edge cases;\n- отсутствие следов живой разработки и ручной эволюции.\n\nРезультат должен быть конкретным, по файлам и признакам. Не больше 3 сильных сторон, 5 проблем, 4 рекомендаций, 6 пунктов детального разбора и 5 AI-сигналов. Верни только JSON без Markdown по схеме:\n{\"summary\":\"string\",\"strengths\":[\"string\"],\"issues\":[{\"title\":\"string\",\"detail\":\"string\",\"severity\":\"low|medium|high\"}],\"recommendations\":[\"string\"],\"detailed_analysis\":[\"string\"],\"ai_detection_signals\":[\"string\"],\"reviewed_files\":[\"string\"],\"assignment_summary\":\"string\",\"assignment_findings\":[\"string\"],\"ai_probability_percent\":0,\"ai_rationale\":[\"string\"],\"overall_score_percent\":0}\n\nREPO: dereddd/artur2\nDESCRIPTION: Contribute to dereddd/artur2 development by creating an account on GitHub.\nDEFAULT_BRANCH: main\nFILES_ANALYZED: 1\nFILES_SKIPPED: 0\n\nREVIEWED_FILES:\n\n\nFILES:\n- artru2/index.html\n\nREADME:\nREADME отсутствует\n\nCODE_SAMPLES:",
+  "response_text": "{\"summary\":\"Репозиторий содержит только один файл index.html без видимого содержания; отсутствуют README, конфигурация и основные модули, что делает проект неработоспособным и незавершённым.\",\"strengths\":[],\"issues\":[{\"title\":\"Отсутствует README\",\"detail\":\"В репозитории нет файла README.md, что затрудняет понимание цели проекта и инструкций по запуску.\",\"severity\":\"high\"},{\"title\":\"Файл index.html пустой или не предоставлен\",\"detail\":\"Содержание файла artru2/index.html отсутствует в предоставленных данных, поэтому невозможно оценить его структуру, семантику или функциональность.\",\"severity\":\"high\"},{\"title\":\"Отсутствие точек входа и конфигурации\",\"detail\":\"Не обнаружены типичные файлы проекта (например, package.json, webpack.config.py, main.py и т.п.), что указывает на отсутствие настроенной сре\"}]}",
+  "response_json": {
+    "id": "gen-1773779603-x14YFVXlIPpfuxj7FCq4",
+    "object": "chat.completion",
+    "created": 1773779603,
+    "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+    "provider": "Nvidia",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "length",
+        "native_finish_reason": "length",
+        "message": {
+          "role": "assistant",
+          "content": "{\"summary\":\"Репозиторий содержит только один файл index.html без видимого содержания; отсутствуют README, конфигурация и основные модули, что делает проект неработоспособным и незавершённым.\",\"strengths\":[],\"issues\":[{\"title\":\"Отсутствует README\",\"detail\":\"В репозитории нет файла README.md, что затрудняет понимание цели проекта и инструкций по запуску.\",\"severity\":\"high\"},{\"title\":\"Файл index.html пустой или не предоставлен\",\"detail\":\"Содержание файла artru2/index.html отсутствует в предоставленных данных, поэтому невозможно оценить его структуру, семантику или функциональность.\",\"severity\":\"high\"},{\"title\":\"Отсутствие точек входа и конфигурации\",\"detail\":\"Не обнаружены типичные файлы проекта (например, package.json, webpack.config.py, main.py и т.п.), что указывает на отсутствие настроенной сре\"}]}",
+          "refusal": null,
+          "reasoning": "We need to output JSON only, with fields as specified. We have only one file: artru2/index.html. Need to analyze it. Since we don't have actual content, we must infer? The prompt says: \"Не пересказывай локальную эвристику и не выдумывай отсутствующие детали.\" Means we shouldn't make up details not present. But we have no content. Possibly the file is empty? We need to review based on what we have: only file path. We cannot assume content. We must state that we cannot analyze content because it's missing? But we must still produce JSON. We can note that file exists but we have no content to review. However we must not fabricate details. So we can say that we cannot determine strengths etc. But we need to output something. Perhaps we can say that the file is missing or empty, leading to issues. We can treat missing content as an issue: file is empty or not provided. We can still give strengths? Probably none. Issues: missing README, missing code, missing entry points, etc. Provide recommendations: add README, implement actual code, etc. Detailed analysis: note that only file present is index.html but we have no content to review. AI detection signals: maybe none. Provide assignment summary: unknown because no assignment provided. Assignment findings: none. AI probability percent: maybe 0 or low. Overall score percent: low.\n\nWe must ensure JSON is valid. Provide arrays of strings. For issues, each object with title, detail, severity.\n\nLet's craft:\n\n{\n \"summary\": \"Репозиторий содержит только один файл index.html без видимого содержания; отсутствуют README, конфигурация и основные модули, что делает проект неработоспособным и незавершённым.\",\n \"strengths\": [],\n \"issues\": [\n   {\"title\": \"Отсутствует README\", \"detail\": \"В репозитории нет файла README.md, что затрудняет понимание цели проекта и инструкций по запуску.\", \"severity\": \"high\"},\n   {\"title\": \"Файл index",
+          "reasoning_details": [
+            {
+              "type": "reasoning.text",
+              "text": "We need to output JSON only, with fields as specified. We have only one file: artru2/index.html. Need to analyze it. Since we don't have actual content, we must infer? The prompt says: \"Не пересказывай локальную эвристику и не выдумывай отсутствующие детали.\" Means we shouldn't make up details not present. But we have no content. Possibly the file is empty? We need to review based on what we have: only file path. We cannot assume content. We must state that we cannot analyze content because it's missing? But we must still produce JSON. We can note that file exists but we have no content to review. However we must not fabricate details. So we can say that we cannot determine strengths etc. But we need to output something. Perhaps we can say that the file is missing or empty, leading to issues. We can treat missing content as an issue: file is empty or not provided. We can still give strengths? Probably none. Issues: missing README, missing code, missing entry points, etc. Provide recommendations: add README, implement actual code, etc. Detailed analysis: note that only file present is index.html but we have no content to review. AI detection signals: maybe none. Provide assignment summary: unknown because no assignment provided. Assignment findings: none. AI probability percent: maybe 0 or low. Overall score percent: low.\n\nWe must ensure JSON is valid. Provide arrays of strings. For issues, each object with title, detail, severity.\n\nLet's craft:\n\n{\n \"summary\": \"Репозиторий содержит только один файл index.html без видимого содержания; отсутствуют README, конфигурация и основные модули, что делает проект неработоспособным и незавершённым.\",\n \"strengths\": [],\n \"issues\": [\n   {\"title\": \"Отсутствует README\", \"detail\": \"В репозитории нет файла README.md, что затрудняет понимание цели проекта и инструкций по запуску.\", \"severity\": \"high\"},\n   {\"title\": \"Файл index",
+              "format": "unknown",
+              "index": 0
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 531,
+      "completion_tokens": 700,
+      "total_tokens": 1231,
+      "cost": 0,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": null,
+        "upstream_inference_prompt_cost": 0,
+        "upstream_inference_completions_cost": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 697,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    }
+  },
+  "parsed_payload": {
+    "summary": "Репозиторий содержит только один файл index.html без видимого содержания; отсутствуют README, конфигурация и основные модули, что делает проект неработоспособным и незавершённым.",
+    "strengths": [],
+    "issues": [
+      {
+        "title": "Отсутствует README",
+        "detail": "В репозитории нет файла README.md, что затрудняет понимание цели проекта и инструкций по запуску.",
+        "severity": "high"
+      },
+      {
+        "title": "Файл index.html пустой или не предоставлен",
+        "detail": "Содержание файла artru2/index.html отсутствует в предоставленных данных, поэтому невозможно оценить его структуру, семантику или функциональность.",
+        "severity": "high"
+      },
+      {
+        "title": "Отсутствие точек входа и конфигурации",
+        "detail": "Не обнаружены типичные файлы проекта (например, package.json, webpack.config.py, main.py и т.п.), что указывает на отсутствие настроенной сре"
+      }
+    ]
+  },
+  "error": "AI returned incomplete structured review",
+  "usage": {
+    "prompt_tokens": 531,
+    "completion_tokens": 700,
+    "cached_tokens": 0,
+    "total_tokens": 1231,
+    "estimated_cost_usd": 0.0
+  }
+}
