@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +29,8 @@ class RepoResearchDigest:
     rubric_lines: list[str] = field(default_factory=list)
     key_file_lines: list[str] = field(default_factory=list)
     reviewed_files: list[str] = field(default_factory=list)
+    backend_name: str = "builtin"
+    external_pack_excerpt: str = ""
 
     def to_prompt_block(self, max_chars: int = 14000) -> str:
         blocks: list[str] = []
@@ -38,6 +44,8 @@ class RepoResearchDigest:
             blocks.append("RUBRIC_HINTS:\n" + "\n".join(f"- {line}" for line in self.rubric_lines))
         if self.key_file_lines:
             blocks.append("KEY_FILE_DIGESTS:\n" + "\n".join(f"- {line}" for line in self.key_file_lines))
+        if self.external_pack_excerpt:
+            blocks.append("REPO_PACK_EXCERPT:\n" + self.external_pack_excerpt)
         text = "\n\n".join(blocks).strip()
         if len(text) <= max_chars:
             return text
@@ -45,6 +53,22 @@ class RepoResearchDigest:
 
 
 def build_repo_research(snapshot: "RepoSnapshot", *, reviewed_limit: int = 16) -> RepoResearchDigest:
+    builtin = _build_builtin_repo_research(snapshot, reviewed_limit=reviewed_limit)
+    backend = os.getenv("REPO_RESEARCH_BACKEND", "auto").strip().lower() or "auto"
+    if backend in {"builtin", "local"}:
+        return builtin
+
+    external = _run_optional_backend(snapshot, backend=backend)
+    if not external:
+        return builtin
+
+    builtin.backend_name = external.backend_name
+    builtin.external_pack_excerpt = external.external_pack_excerpt
+    builtin.overview_lines.insert(0, f"Дополнительная AI-friendly сводка собрана через backend: {external.backend_name}.")
+    return builtin
+
+
+def _build_builtin_repo_research(snapshot: "RepoSnapshot", *, reviewed_limit: int = 16) -> RepoResearchDigest:
     files = list(snapshot.files)
     source_files = [file for file in files if file.path.lower().endswith(SOURCE_EXTENSIONS)]
     top_dirs = Counter(file.path.split("/", 1)[0] for file in files if "/" in file.path)
@@ -100,6 +124,78 @@ def build_repo_research(snapshot: "RepoSnapshot", *, reviewed_limit: int = 16) -
         key_file_lines=key_file_lines,
         reviewed_files=[file.path for file in reviewed],
     )
+
+
+def _run_optional_backend(snapshot: "RepoSnapshot", *, backend: str) -> RepoResearchDigest | None:
+    backend = backend.lower()
+    if backend in {"auto", "repopack", "repomix"}:
+        digest = _run_repomix_backend(snapshot)
+        if digest:
+            return digest
+    return None
+
+
+def _run_repomix_backend(snapshot: "RepoSnapshot") -> RepoResearchDigest | None:
+    commands = [
+        ["repomix"],
+        ["repopack"],
+        ["npx", "repomix"],
+        ["npx", "repopack"],
+    ]
+    timeout_seconds = int(os.getenv("REPO_RESEARCH_TOOL_TIMEOUT_SECONDS", "120"))
+    output_name = "repo-pack.txt"
+
+    with tempfile.TemporaryDirectory(prefix="repo-research-") as tmp_dir:
+        root = Path(tmp_dir)
+        _write_snapshot_to_tempdir(snapshot, root)
+        output_path = root / output_name
+
+        for command in commands:
+            executable = command[0]
+            if executable != "npx" and shutil.which(executable) is None:
+                continue
+            full_command = [*command, str(root), "--style", "plain", "--output", output_name]
+            try:
+                completed = subprocess.run(
+                    full_command,
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_seconds,
+                    check=False,
+                )
+            except (OSError, subprocess.SubprocessError):
+                continue
+            if completed.returncode != 0 or not output_path.exists():
+                continue
+
+            try:
+                packed_text = output_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            excerpt = packed_text.strip()
+            if not excerpt:
+                continue
+            backend_name = "repomix" if "repomix" in " ".join(command).lower() else "repopack"
+            return RepoResearchDigest(
+                backend_name=backend_name,
+                external_pack_excerpt=_trim_pack_excerpt(excerpt),
+            )
+    return None
+
+
+def _write_snapshot_to_tempdir(snapshot: "RepoSnapshot", root: Path) -> None:
+    for file in snapshot.files:
+        target = root / Path(file.path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(file.content, encoding="utf-8")
+
+
+def _trim_pack_excerpt(text: str, limit: int = 9000) -> str:
+    stripped = text.strip()
+    if len(stripped) <= limit:
+        return stripped
+    return stripped[: limit - 20].rstrip() + "\n... [truncated]"
 
 
 def _count_non_empty_lines(content: str) -> int:
@@ -264,3 +360,34 @@ def _infer_role(path: str, content: str) -> str:
 def _rubric_line(name: str, primary_signal: bool, first_value: int, second_value: int) -> str:
     status = "скорее покрыто" if primary_signal else "есть риск недоработки"
     return f"{name}: {status}; вспомогательные сигналы {first_value}/{second_value}."
+
+def main() -> int:
+    import argparse
+    from bot_runtime import GitHubClient, extract_repo_url, get_settings
+
+    parser = argparse.ArgumentParser(description="Build a compact research digest for a GitHub repository.")
+    parser.add_argument("repo_url", help="GitHub repository URL")
+    parser.add_argument("--output", default=".cache/repo_research.txt", help="Where to save the digest text")
+    parser.add_argument("--backend", default="", help="Research backend override: builtin, repomix/repopack, auto")
+    args = parser.parse_args()
+
+    if args.backend:
+        os.environ["REPO_RESEARCH_BACKEND"] = args.backend
+
+    settings = get_settings()
+    github = GitHubClient(settings)
+    snapshot = github.fetch_snapshot(extract_repo_url(args.repo_url))
+    research = build_repo_research(snapshot)
+    text = research.to_prompt_block(max_chars=20000)
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(text, encoding="utf-8")
+
+    print(text)
+    print(f"\nSaved: {output_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

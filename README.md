@@ -13,13 +13,21 @@
   - AI недоступен -> отчет только локальный;
 - считать локальный бюджет токенов и останавливать AI-проверки при исчерпании лимита;
 - принимать ТЗ в формате `pdf`, `docx`, `txt`, `md` и сравнивать требования с кодом репозитория;
-- запускать регрессионный eval-набор для контроля качества после правок.
+- запускать регрессионный eval-набор для контроля качества после правок;
+- собирать исследовательскую сводку по репозиторию перед AI-проверкой;
+- при наличии внешнего open source packer-а использовать optional backend `repomix/repopack` для более полной AI-friendly сводки.
 
 ## Запуск
 
 ```bash
 pip install -r requirements.txt
 python main.py
+```
+
+Для отдельного запуска researcher как CLI:
+
+```bash
+python repo_research_runtime.py https://github.com/owner/repo
 ```
 
 ## Команды бота
@@ -78,6 +86,8 @@ OPENROUTER_RETRY_TOKEN_STEP=1000
 OPENROUTER_RETRY_MAX_OUTPUT_TOKENS=5000
 
 REPORT_SHOW_DEBUG_DETAILS=false
+REPO_RESEARCH_BACKEND=auto
+REPO_RESEARCH_TOOL_TIMEOUT_SECONDS=120
 
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash-lite
@@ -94,6 +104,20 @@ GIGACHAT_MODEL=GigaChat-2-Lite
 GIGACHAT_VERIFY_SSL=true
 ```
 
+`REPO_RESEARCH_BACKEND` поддерживает:
+
+- `auto` — сначала пробует внешний packer, потом падает в builtin research
+- `builtin` — только встроенный researcher
+- `repomix` / `repopack` — принудительно пробует внешний backend
+
+Если хочешь использовать внешний backend, удобно поставить один из CLI-инструментов:
+
+```bash
+npm install -g repomix
+```
+
+или запускать через `npx`, если он доступен в системе.
+
 ## Регрессионный eval-набор
 
 Для быстрой проверки качества отчетов можно использовать пример набора кейсов:
@@ -103,6 +127,12 @@ python tools/review_eval.py --cases eval_cases.example.json
 ```
 
 Результат будет сохранен в `.cache/eval_report.json`.
+
+Для отдельной исследовательской сводки без запуска Telegram-бота:
+
+```bash
+python repo_research_runtime.py https://github.com/owner/repo --backend auto --output .cache/repo_research.txt
+```
 
 В `eval_cases.example.json` можно задавать:
 
