@@ -95,6 +95,8 @@ AI_PHRASES = (
     "production-ready",
     "comprehensive solution",
 )
+TELEGRAM_TEXT_LIMIT = 4096
+TELEGRAM_SAFE_TEXT_LIMIT = 3900
 
 
 @dataclass(slots=True)
@@ -158,6 +160,30 @@ class ReviewResult:
     assignment_findings: list[str] = field(default_factory=list)
     review_source: str = "Эвристика"
     provider_attempts: list[str] = field(default_factory=list)
+
+
+class TelegramAPIError(RuntimeError):
+    def __init__(
+        self,
+        operation: str,
+        status_code: int | None,
+        description: str,
+        *,
+        response_text: str = "",
+        request_url: str = "",
+    ) -> None:
+        self.operation = operation
+        self.status_code = status_code
+        self.description = description.strip() or "Telegram API error"
+        self.response_text = response_text
+        self.request_url = request_url
+        super().__init__(self.__str__())
+
+    def __str__(self) -> str:
+        prefix = f"{self.operation} failed"
+        if self.status_code is not None:
+            prefix += f" with HTTP {self.status_code}"
+        return f"{prefix}: {self.description}"
 
 
 def _pid_is_running(pid: int) -> bool:
@@ -348,20 +374,18 @@ def legacy_handle_update(
         )
     except ValueError as exc:
         telegram.send_message(chat_id, html.escape(str(exc)), reply_to_message_id=message_id)
-    except HTTPError as exc:
-        logger.exception("GitHub request failed")
-        telegram.send_message(
-            chat_id,
-            f"Не получилось скачать репозиторий с GitHub: {exc.response.status_code}.",
-            reply_to_message_id=message_id,
-        )
+    except TelegramAPIError as exc:
+        logger.exception("Telegram API request failed while processing repository review")
+        logger.error("Telegram API details: %s", _telegram_error_description(exc))
+        return
     except requests.ConnectionError:
-        logger.exception("GitHub connection failed")
+        publish_status("Не получилось выполнить сетевой запрос во время проверки.")
+        logger.exception("Network request failed during repository review")
         telegram.send_message(
             chat_id,
             (
-                "Не получилось подключиться к GitHub. "
-                "Похоже, сеть или прокси блокирует доступ к <code>api.github.com</code>."
+                "Не получилось выполнить часть сетевых запросов для проверки. "
+                "Попробуйте повторить запрос чуть позже."
             ),
             reply_to_message_id=message_id,
         )
@@ -505,6 +529,138 @@ def handle_update(
         assignment_store=assignment_store,
     )
 
+def _telegram_error_description(exc: TelegramAPIError) -> str:
+    text = exc.description.strip()
+    if text:
+        return text
+    return exc.response_text.strip()[:300] or "Unknown Telegram API error"
+
+
+def _plain_text_chunks(text: str, *, limit: int = TELEGRAM_SAFE_TEXT_LIMIT) -> list[str]:
+    normalized = text.strip()
+    if not normalized:
+        return [""]
+
+    chunks: list[str] = []
+    current = ""
+    for paragraph in normalized.split("\n\n"):
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        candidate = paragraph if not current else f"{current}\n\n{paragraph}"
+        if len(candidate) <= limit:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+        if len(paragraph) <= limit:
+            current = paragraph
+            continue
+        lines = paragraph.splitlines() or [paragraph]
+        current = ""
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            candidate = line if not current else f"{current}\n{line}"
+            if len(candidate) <= limit:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current)
+            while len(line) > limit:
+                chunks.append(line[:limit])
+                line = line[limit:]
+            current = line
+    if current:
+        chunks.append(current)
+    return chunks or [normalized[:limit]]
+
+
+def _html_to_plain_text(text: str) -> str:
+    plain = text.replace("<b>", "").replace("</b>", "")
+    plain = plain.replace("<code>", "").replace("</code>", "")
+    plain = plain.replace("<pre>", "").replace("</pre>", "")
+    plain = plain.replace("•", "-")
+    return html.unescape(plain)
+
+
+def _split_report_for_telegram(report: str) -> list[tuple[str, str | None]]:
+    if len(report) <= TELEGRAM_TEXT_LIMIT:
+        return [(report, "HTML")]
+
+    chunks: list[tuple[str, str | None]] = []
+    current = ""
+    for section in [item.strip() for item in report.split("\n\n") if item.strip()]:
+        candidate = section if not current else f"{current}\n\n{section}"
+        if len(candidate) <= TELEGRAM_SAFE_TEXT_LIMIT:
+            current = candidate
+            continue
+        if current:
+            chunks.append((current, "HTML"))
+        if len(section) <= TELEGRAM_SAFE_TEXT_LIMIT:
+            current = section
+            continue
+        plain_chunks = _plain_text_chunks(_html_to_plain_text(section))
+        chunks.extend((chunk, None) for chunk in plain_chunks if chunk)
+        current = ""
+    if current:
+        chunks.append((current, "HTML"))
+    return chunks or [(report[:TELEGRAM_SAFE_TEXT_LIMIT], None)]
+
+
+def _deliver_report(
+    *,
+    telegram: "TelegramBotAPI",
+    chat_id: int,
+    message_id: int | None,
+    status_message_id: int | None,
+    report: str,
+) -> None:
+    chunks = _split_report_for_telegram(report)
+
+    def send_chunks(items: list[tuple[str, str | None]]) -> None:
+        first_text, first_parse_mode = items[0]
+        first_sent = False
+
+        if status_message_id:
+            try:
+                telegram.edit_message(
+                    chat_id,
+                    status_message_id,
+                    first_text,
+                    disable_web_page_preview=True,
+                    parse_mode=first_parse_mode,
+                )
+                first_sent = True
+            except TelegramAPIError:
+                logger.exception("Failed to replace status message with final report")
+
+        if not first_sent:
+            telegram.send_message(
+                chat_id,
+                first_text,
+                disable_web_page_preview=True,
+                reply_to_message_id=message_id,
+                parse_mode=first_parse_mode,
+            )
+
+        for chunk_text, chunk_parse_mode in items[1:]:
+            telegram.send_message(
+                chat_id,
+                chunk_text,
+                disable_web_page_preview=True,
+                parse_mode=chunk_parse_mode,
+            )
+
+    try:
+        send_chunks(chunks)
+    except TelegramAPIError:
+        logger.exception("Telegram rejected HTML report, retrying with plain text chunks")
+        plain_chunks = [(chunk, None) for chunk in _plain_text_chunks(_html_to_plain_text(report))]
+        send_chunks(plain_chunks)
+
+
 
 def process_repository_review(
     *,
@@ -526,7 +682,7 @@ def process_repository_review(
             return
         try:
             telegram.edit_message(chat_id, status_message_id, status_text)
-        except Exception:  # noqa: BLE001
+        except TelegramAPIError:
             logger.exception("Failed to update status message")
 
     try:
@@ -538,49 +694,64 @@ def process_repository_review(
             reply_to_message_id=message_id,
         )
 
-        snapshot = github_client.fetch_snapshot(extract_repo_url(repo_url))
+        try:
+            snapshot = github_client.fetch_snapshot(extract_repo_url(repo_url))
+        except HTTPError as exc:
+            publish_status("GitHub вернул ошибку при загрузке репозитория.")
+            logger.exception("GitHub request failed")
+            status_code = exc.response.status_code if exc.response is not None else "unknown"
+            telegram.send_message(
+                chat_id,
+                f"Не получилось скачать репозиторий с GitHub. Код ответа: {status_code}. Попробуйте повторить запрос чуть позже.",
+                reply_to_message_id=message_id,
+            )
+            return
+        except requests.ConnectionError:
+            publish_status("Не получилось подключиться к GitHub.")
+            logger.exception("GitHub connection failed")
+            telegram.send_message(
+                chat_id,
+                (
+                    "Не получилось подключиться к GitHub. "
+                    "Похоже, сеть или прокси блокирует доступ к <code>api.github.com</code>."
+                ),
+                reply_to_message_id=message_id,
+            )
+            return
+
         publish_status("Ссылка принята. Репозиторий скачан, собираю контекст для проверки...")
         assignment_document = assignment_store.load(chat_id)
         if assignment_document:
             snapshot.assignment_text = assignment_document.text
             snapshot.assignment_filename = assignment_document.filename
-            publish_status(f"ТЗ {assignment_document.filename} найдено. Сравниваю требования с проектом...")
+            publish_status(
+                f"ТЗ {assignment_document.filename} найдено. Сравниваю требования с проектом..."
+            )
         heuristic = analyzer.analyze(snapshot)
         result = reviewer.review(snapshot, heuristic, progress_callback=publish_status)
         publish_status("Проверка завершена. Отправляю итоговый отчет...")
         report = render_report_v2(snapshot, result)
-        if status_message_id:
-            try:
-                telegram.edit_message(
-                    chat_id,
-                    status_message_id,
-                    report,
-                    disable_web_page_preview=True,
-                )
-                return
-            except Exception:  # noqa: BLE001
-                logger.exception("Failed to replace status message with final report")
-        telegram.send_message(chat_id, report, disable_web_page_preview=True, reply_to_message_id=message_id)
+        _deliver_report(
+            telegram=telegram,
+            chat_id=chat_id,
+            message_id=message_id,
+            status_message_id=status_message_id,
+            report=report,
+        )
     except ValueError as exc:
         publish_status("Не удалось запустить проверку: ссылка или данные проекта не подошли.")
         telegram.send_message(chat_id, html.escape(str(exc)), reply_to_message_id=message_id)
-    except HTTPError as exc:
-        publish_status("GitHub вернул ошибку при загрузке репозитория.")
-        logger.exception("GitHub request failed")
-        status_code = exc.response.status_code if exc.response is not None else "unknown"
-        telegram.send_message(
-            chat_id,
-            f"Не получилось скачать репозиторий с GitHub. Код ответа: {status_code}. Попробуйте повторить запрос чуть позже.",
-            reply_to_message_id=message_id,
-        )
+    except TelegramAPIError as exc:
+        logger.exception("Telegram API request failed while processing repository review")
+        logger.error("Telegram API details: %s", _telegram_error_description(exc))
     except requests.ConnectionError:
-        publish_status("Не получилось подключиться к GitHub.")
-        logger.exception("GitHub connection failed")
+        publish_status("Не получилось выполнить сетевой запрос во время проверки.")
+        logger.exception("Network request failed during repository review")
         telegram.send_message(
             chat_id,
             (
-                "Не получилось подключиться к GitHub. "
-                "Похоже, сеть или прокси блокирует доступ к <code>api.github.com</code>."
+                "Не получилось выполнить часть сетевых запросов для проверки. "
+                "Попробуйте повторить запрос чуть позже."
             ),
             reply_to_message_id=message_id,
         )
@@ -986,6 +1157,27 @@ class TelegramBotAPI:
         )
         response.raise_for_status()
 
+    def _raise_telegram_error(self, operation: str, response: requests.Response) -> None:
+        description = ""
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+
+        if isinstance(payload, dict):
+            description = str(payload.get("description") or "").strip()
+        if not description:
+            description = response.text.strip()[:500]
+
+        request_url = response.request.url if response.request is not None else ""
+        raise TelegramAPIError(
+            operation,
+            response.status_code,
+            description,
+            response_text=response.text,
+            request_url=request_url,
+        )
+
     def send_message(
         self,
         chat_id: int,
@@ -1009,10 +1201,12 @@ class TelegramBotAPI:
             json=payload,
             timeout=20,
         )
-        response.raise_for_status()
+        if not response.ok:
+            self._raise_telegram_error("sendMessage", response)
         data = response.json()
         if not data.get("ok"):
-            raise RuntimeError(f"Telegram sendMessage error: {data}")
+            description = str(data.get("description") or f"Telegram sendMessage error: {data}")
+            raise TelegramAPIError("sendMessage", response.status_code, description, response_text=response.text)
         result = data.get("result") or {}
         return result.get("message_id")
 
@@ -1033,10 +1227,12 @@ class TelegramBotAPI:
         if parse_mode:
             payload["parse_mode"] = parse_mode
         response = self.session.post(f"{self.base_url}/editMessageText", json=payload, timeout=20)
-        response.raise_for_status()
+        if not response.ok:
+            self._raise_telegram_error("editMessageText", response)
         data = response.json()
         if not data.get("ok"):
-            raise RuntimeError(f"Telegram editMessageText error: {data}")
+            description = str(data.get("description") or f"Telegram editMessageText error: {data}")
+            raise TelegramAPIError("editMessageText", response.status_code, description, response_text=response.text)
 
     def get_file_path(self, file_id: str) -> str:
         response = self.session.get(f"{self.base_url}/getFile", params={"file_id": file_id}, timeout=20)
