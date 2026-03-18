@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -34,6 +35,9 @@ def render_report_v2(snapshot: "RepoSnapshot", result: "ReviewResult") -> str:
     if result.detailed_analysis:
         parts.append("<b>Детальный разбор:</b>\n" + render_list(result.detailed_analysis))
 
+    if result.rubric_breakdown:
+        parts.append("<b>Оценка по критериям:</b>\n" + render_list(result.rubric_breakdown))
+
     parts.append("<b>Рекомендации:</b>\n" + render_list(result.recommendations))
     parts.append(
         "<b>Вероятность использования AI:</b> "
@@ -44,10 +48,35 @@ def render_report_v2(snapshot: "RepoSnapshot", result: "ReviewResult") -> str:
     if result.ai_detection_signals:
         parts.append("<b>Сигналы AI-детекта:</b>\n" + render_list(result.ai_detection_signals))
 
-    if result.provider_attempts:
-        parts.append("<b>Статус AI и бюджета:</b>\n" + render_list(result.provider_attempts))
+    ai_status_block = render_ai_status(result)
+    if ai_status_block:
+        parts.append(ai_status_block)
 
     return "\n\n".join(parts)
+
+
+def render_ai_status(result: "ReviewResult") -> str:
+    show_debug = os.getenv("REPORT_SHOW_DEBUG_DETAILS", "false").lower() == "true"
+    if show_debug and result.provider_attempts:
+        return "<b>Статус AI и бюджета:</b>\n" + render_list(result.provider_attempts)
+
+    if not result.provider_attempts:
+        return ""
+
+    concise_lines: list[str] = []
+    if result.review_source.startswith("AI:"):
+        concise_lines.append("AI-отчет собран успешно.")
+    else:
+        concise_lines.append("AI не дал достаточно надежный итоговый ответ, поэтому включен локальный резервный анализ.")
+
+    lower_attempts = " ".join(result.provider_attempts).lower()
+    if "cooldown" in lower_attempts or "temporarily unavailable" in lower_attempts or "429" in lower_attempts:
+        concise_lines.append("Часть AI-провайдеров была временно недоступна.")
+    if any(marker in lower_attempts for marker in ("truncated review", "incomplete structured review", "no content generated")):
+        concise_lines.append("Часть AI-ответов оказалась неполной или пустой.")
+
+    concise_lines.append("Технические подробности доступны командой /lastdebug.")
+    return "<b>Статус AI:</b>\n" + render_list(concise_lines)
 
 
 def render_list(items: list[str]) -> str:

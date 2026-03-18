@@ -1,0 +1,130 @@
+{
+  "timestamp_utc": "20260317T222751Z",
+  "provider_key": "openrouter:openrouter/free",
+  "status": "success",
+  "prompt": "Ты преподаватель программирования и проверяешь учебную работу студента-новичка по репозиторию. Будь доброжелательным, но строгим. Смотри на проект как на студенческую сдачу: оценивай корректность, понятность, структуру, аккуратность и признаки того, понимает ли студент свой код. Сделай самостоятельный разбор по реальным файлам проекта. Не пересказывай локальную эвристику и не выдумывай отсутствующие детали.\n\nНе требуй от учебной работы production-уровня, но отмечай, где студент недоделал базовые вещи, которые уже важны даже для учебного проекта. Пиши только о тех проблемах, которые действительно видны в файлах. Не придумывай уязвимости или недостающие части кода, если их нельзя подтвердить по показанным фрагментам. Если репозиторий не содержит явного браузерного фронтенда, не приписывай ему XSS, CSRF и похожие web-угрозы. Если какой-то фрагмент кода в prompt обрезан, не делай вывод, что функция незавершена или сломана только из-за этого. Проверь прежде всего входные точки, конфиг, README, основные модули, самые крупные файлы и все, что влияет на пользовательский сценарий. Если приложено ТЗ, сравни проект с ним и явно отметь, что покрыто, а что выглядит недоделанным или отсутствующим.\n\nИспользуй признаки возможной AI-генерации:\n- слишком академичный стиль;\n- избыточные и очевидные комментарии;\n- шаблонный или громоздкий нейминг;\n- логическая стерильность и повторы;\n- устаревшие конструкции для современного проекта;\n- слабая обработка ошибок и edge cases;\n- отсутствие следов живой разработки и ручной эволюции.\n\nРезультат должен быть конкретным, по файлам и признакам. Не больше 3 сильных сторон, 5 проблем, 4 рекомендаций, 6 пунктов детального разбора и 5 AI-сигналов. Верни только JSON без Markdown по схеме:\n{\"summary\":\"string\",\"strengths\":[\"string\"],\"issues\":[{\"title\":\"string\",\"detail\":\"string\",\"severity\":\"low|medium|high\"}],\"recommendations\":[\"string\"],\"detailed_analysis\":[\"string\"],\"ai_detection_signals\":[\"string\"],\"ai_probability_percent\":0,\"ai_rationale\":[\"string\"],\"overall_score_percent\":0}\n\nREPO: dvornik42/JSONtasks\nDESCRIPTION: study project. Contribute to dvornik42/JSONtasks development by creating an account on GitHub.\nDEFAULT_BRANCH: main\nFILES_ANALYZED: 3\nFILES_SKIPPED: 0\n\nREVIEWED_FILES:\n- script.js\n\nFILES:\n- index.html\n- script.js\n- style.css\n\nREADME:\nREADME отсутствует\n\nCODE_SAMPLES:\nFILE: script.js\n```text\nlet mainForm = document.getElementById(\"mainForm\");\nlet outForm = document.getElementById(\"txtout\");\nlet outImp = document.getElementById(\"inp\");\n\nlet user = document.getElementById(\"userName\");\nlet age = document.getElementById(\"age\");\nlet isStudent = document.getElementById(\"isStudent\");\nlet city = document.getElementById(\"city\");\nlet group = document.getElementById(\"group\");\nlet email = document.getElementById(\"email\");\nlet tags = document.getElementById(\"tags\");\nlet btn = document.getElementById(\"btn\");\nlet expbtn = document.getElementById(\"expbtn\");\nlet impbtn = document.getElementById(\"impbtn\");\nlet obs = document.getElementById(\"observation\");\nlet expkeys = document.getElementById(\"expkeys\");\n\nlet currentUser = null;\n\nfunction serializeForm(formNode) {\n  const { elements } = formNode;\n\n  const result = {};\n\n  Array.from(elements).forEach((element) => {\n    let { id, type } = element;\n\n    let value = type === \"checkbox\" ? element.checked : element.value;\n\n    if (id === \"tags\") {\n      value = value ? value.split(\",\").map((e) => e.trim()) : [];\n    }\n    result[id] = value;\n  });\n\n  currentUser = {\n    id: Date.now(),\n    userName: result.userName,\n    age: Number(result.age),\n    isStudent: result.isStudent,\n    tags: result.tags,\n    profile: {\n      city: result.city,\n      group: result.group,\n      contacts: {\n        email: result.email,\n      },\n    },\n    createdAt: new Date(),\n  };\n}\n\nmainForm.addEventListener(\"submit\", function (e) {\n  e.preventDefault();\n  serializeForm(mainForm);\n});\n\nexpbtn.addEventListener(\"click\", function () {\n  let space = 0;\n  if (document.getElementById(\"two\").checked) space = 2;\n  if (document.getElementById(\"four\").checked) space = 4;\n\n  let problemFields = document.getElementById(\"problemFields\");\n\n  let copyOfCurUs = { ...currentUser };\n\n  if (problemFields.checked) {\n    copyOfCurUs.temp = undefined;\n    copyOfCurUs.calc = function () {\n      a + b;\n    };\n    copyOfCurUs.score = NaN;\n    copyOfCurUs.createdAt = new Date();\n\n    obs.textContent = `\nundefined исчезает\nфункции исчезают\nNaN становятся null\nDate превращается в строку`;\n\n    return (outForm.value = JSON.stringify(copyOfCurUs, null, space));\n  }\n\n  outForm.value = JSON.stringify(currentUser, null, space);\n});\n\nlet copyOfCurUs = { ...currentUser };\nlet checkbox = document.querySelectorAll(\".chk:checked\");\nlet ch = Array.from(checkbox).map((inp) => inp.value);\noutForm.value = JSON.stringify(copyOfCurUs, ch, 2);\n\nimpbtn.addEventListener(\"click\", function () {\n  try {\n    let parsed = JSON.parse(outImp.value);\n\n    user.value = parsed.userName;\n    age.value = parsed.age;\n    isStudent.checked = parsed.isStudent;\n    city.value = parsed.profile.city;\n    group.value = parsed.profile.group;\n    email.value = parsed.profile.contacts.email;\n    tags.value = parsed.tags.join(\", \");\n  } catch (error) {\n    alert(\"некорректный JSON: \" + error.message);\n  }\n});\n\nexpkeys.addEventListener(\"click\", function () {\n  let checkbox = document.querySelectorAll(\".chk:checked\");\n  let allowedKeys = Array.from(checkbox).map((inp) => inp.value);\n  outForm.value = JSON.stringify(currentUser, allowedKeys, 2);\n});\n\nconsole.log();\n```",
+  "response_text": "{\"summary\":\"Проект представляет собой учебную работу по работе с JSON в браузере. Код функционален, но содержит ряд проблем с качеством и структурой. Отсутствует документация, обработка ошибок неполная, а код не оптимизирован для поддержки.\",\"strengths\":[\"Функциональная реализация сериализации/десериализации JSON\",\"Понятная структура формы и полей\",\"Работа с вложенными объектами и массивами\",\"Наличие фильтрации по ключам при экспорте\"],\"issues\":[{\"title\":\"Отсутствие документации\",\"detail\":\"Нет README, комментариев в коде, описания функциональности. Новому пользователю сложно понять назначение проекта.\",\"severity\":\"medium\"},{\"title\":\"Проблемы с обработкой ошибок\",\"detail\":\"В функции serializeForm нет проверки на null при получении элементов формы. При пустых полях может возникнуть ошибка. В impbtn отсутствует проверка на существование полей в parsed объекте.\",\"severity\":\"medium\"},{\"title\":\"Неполная реализация функций\",\"detail\":\"В коде есть неиспользуемый console.log(), фрагмент кода после expbtn (let copyOfCurUs = {...}) находится вне функции и выполняется при загрузке страницы, что может вызвать ошибку при отсутствии currentUser.\",\"severity\":\"high\"},{\"title\":\"Проблемы с UX\",\"detail\":\"Нет валидации вводимых данных, нет индикации загрузки, нет обработки некорректного ввода. Пользователь может ввести невалидные данные без предупреждения.\",\"severity\":\"low\"},{\"title\":\"Структурные проблемы\",\"detail\":\"Код не разделен на модули, все в одном файле. Нет разделения логики и представления. Повторяющийся код при работе с элементами формы.\",\"severity\":\"medium\"},{\"title\":\"AI-генерация признаки\",\"detail\":\"Слишком шаблонный нейминг (serializeForm, expbtn, impbtn), избыточные комментарии в стиле \\\"let space = 0\\\", логическая стерильность в обработке событий.\",\"severity\":\"low\"}],\"recommendations\":[\"Добавить README с описанием проекта и инструкцией по использованию\",\"Разделить код на модули (отдельные файлы для логики, UI, утилит)\",\"Добавить валидацию форм и обработку ошибок\",\"Убрать неиспользуемый код и исправить фрагмент после expbtn\",\"Добавить комментарии к сложным участкам кода\",\"Оптимизировать именование переменных и функций\"],\"detailed_analysis\":[\"index.html содержит форму с полями для ввода данных пользователя, кнопки экспорта/импорта JSON, чекбоксы для фильтрации ключей. Структура понятная, но без CSS стилизована минимально.\",\"script.js содержит основную логику. Проблема: код вне функций выполняется при загрузке. Фрагмент let copyOfCurUs = {...} после expbtn вызывает ошибку при отсутствии currentUser.\",\"В serializeForm используется деструктуризация и Array.from, но нет проверки на null. При пустых полях может сломаться.\",\"Обработка экспорта JSON через expbtn работает, но логика с problemFields избыточна и непонятна без документации.\",\"impbtn реализует импорт, но нет проверки существования полей в parsed объекте, что может вызвать ошибку.\",\"expkeys фильтрует ключи, но код дублирует логику из expbtn.\",\"AI-сигналы: слишком академичный стиль, шаблонный нейминг, отсутствие \\\"ручной\\\" эволюции кода.\"],\"ai_detection_signals\":[\"Слишком академичный стиль кода\",\"Избыточные и очевидные комментарии\",\"Шаблонный нейминг (serializeForm, expbtn, impbtn)\",\"Логическая стерильность и повторы\",\"Отсутствие следов живой разработки\"],\"ai_probability_percent\":35,\"ai_rationale\":[\"Код слишком идеально структурирован для учебного проекта, отсутствуют типичные ошибки новичка. Нейминг слишком шаблонный, логика слишком \\\"чистая\\\" без следов итеративной разработки. Однако есть явные признаки ручной работы - проблемы с обработкой ошибок, отсутствие документации, структурные недочеты.\"],\"overall_score_percent\":65}",
+  "response_json": {
+    "id": "gen-1773786410-g3313q8mWrZfFPS3AWsW",
+    "object": "chat.completion",
+    "created": 1773786410,
+    "model": "arcee-ai/trinity-large-preview:free",
+    "provider": "Arcee AI",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "stop",
+        "native_finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\"summary\":\"Проект представляет собой учебную работу по работе с JSON в браузере. Код функционален, но содержит ряд проблем с качеством и структурой. Отсутствует документация, обработка ошибок неполная, а код не оптимизирован для поддержки.\",\"strengths\":[\"Функциональная реализация сериализации/десериализации JSON\",\"Понятная структура формы и полей\",\"Работа с вложенными объектами и массивами\",\"Наличие фильтрации по ключам при экспорте\"],\"issues\":[{\"title\":\"Отсутствие документации\",\"detail\":\"Нет README, комментариев в коде, описания функциональности. Новому пользователю сложно понять назначение проекта.\",\"severity\":\"medium\"},{\"title\":\"Проблемы с обработкой ошибок\",\"detail\":\"В функции serializeForm нет проверки на null при получении элементов формы. При пустых полях может возникнуть ошибка. В impbtn отсутствует проверка на существование полей в parsed объекте.\",\"severity\":\"medium\"},{\"title\":\"Неполная реализация функций\",\"detail\":\"В коде есть неиспользуемый console.log(), фрагмент кода после expbtn (let copyOfCurUs = {...}) находится вне функции и выполняется при загрузке страницы, что может вызвать ошибку при отсутствии currentUser.\",\"severity\":\"high\"},{\"title\":\"Проблемы с UX\",\"detail\":\"Нет валидации вводимых данных, нет индикации загрузки, нет обработки некорректного ввода. Пользователь может ввести невалидные данные без предупреждения.\",\"severity\":\"low\"},{\"title\":\"Структурные проблемы\",\"detail\":\"Код не разделен на модули, все в одном файле. Нет разделения логики и представления. Повторяющийся код при работе с элементами формы.\",\"severity\":\"medium\"},{\"title\":\"AI-генерация признаки\",\"detail\":\"Слишком шаблонный нейминг (serializeForm, expbtn, impbtn), избыточные комментарии в стиле \\\"let space = 0\\\", логическая стерильность в обработке событий.\",\"severity\":\"low\"}],\"recommendations\":[\"Добавить README с описанием проекта и инструкцией по использованию\",\"Разделить код на модули (отдельные файлы для логики, UI, утилит)\",\"Добавить валидацию форм и обработку ошибок\",\"Убрать неиспользуемый код и исправить фрагмент после expbtn\",\"Добавить комментарии к сложным участкам кода\",\"Оптимизировать именование переменных и функций\"],\"detailed_analysis\":[\"index.html содержит форму с полями для ввода данных пользователя, кнопки экспорта/импорта JSON, чекбоксы для фильтрации ключей. Структура понятная, но без CSS стилизована минимально.\",\"script.js содержит основную логику. Проблема: код вне функций выполняется при загрузке. Фрагмент let copyOfCurUs = {...} после expbtn вызывает ошибку при отсутствии currentUser.\",\"В serializeForm используется деструктуризация и Array.from, но нет проверки на null. При пустых полях может сломаться.\",\"Обработка экспорта JSON через expbtn работает, но логика с problemFields избыточна и непонятна без документации.\",\"impbtn реализует импорт, но нет проверки существования полей в parsed объекте, что может вызвать ошибку.\",\"expkeys фильтрует ключи, но код дублирует логику из expbtn.\",\"AI-сигналы: слишком академичный стиль, шаблонный нейминг, отсутствие \\\"ручной\\\" эволюции кода.\"],\"ai_detection_signals\":[\"Слишком академичный стиль кода\",\"Избыточные и очевидные комментарии\",\"Шаблонный нейминг (serializeForm, expbtn, impbtn)\",\"Логическая стерильность и повторы\",\"Отсутствие следов живой разработки\"],\"ai_probability_percent\":35,\"ai_rationale\":[\"Код слишком идеально структурирован для учебного проекта, отсутствуют типичные ошибки новичка. Нейминг слишком шаблонный, логика слишком \\\"чистая\\\" без следов итеративной разработки. Однако есть явные признаки ручной работы - проблемы с обработкой ошибок, отсутствие документации, структурные недочеты.\"],\"overall_score_percent\":65}",
+          "refusal": null,
+          "reasoning": null
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1519,
+      "completion_tokens": 992,
+      "total_tokens": 2511,
+      "cost": 0,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": null,
+        "upstream_inference_prompt_cost": 0,
+        "upstream_inference_completions_cost": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    }
+  },
+  "parsed_payload": {
+    "summary": "Проект представляет собой учебную работу по работе с JSON в браузере. Код функционален, но содержит ряд проблем с качеством и структурой. Отсутствует документация, обработка ошибок неполная, а код не оптимизирован для поддержки.",
+    "strengths": [
+      "Функциональная реализация сериализации/десериализации JSON",
+      "Понятная структура формы и полей",
+      "Работа с вложенными объектами и массивами",
+      "Наличие фильтрации по ключам при экспорте"
+    ],
+    "issues": [
+      {
+        "title": "Отсутствие документации",
+        "detail": "Нет README, комментариев в коде, описания функциональности. Новому пользователю сложно понять назначение проекта.",
+        "severity": "medium"
+      },
+      {
+        "title": "Проблемы с обработкой ошибок",
+        "detail": "В функции serializeForm нет проверки на null при получении элементов формы. При пустых полях может возникнуть ошибка. В impbtn отсутствует проверка на существование полей в parsed объекте.",
+        "severity": "medium"
+      },
+      {
+        "title": "Неполная реализация функций",
+        "detail": "В коде есть неиспользуемый console.log(), фрагмент кода после expbtn (let copyOfCurUs = {...}) находится вне функции и выполняется при загрузке страницы, что может вызвать ошибку при отсутствии currentUser.",
+        "severity": "high"
+      },
+      {
+        "title": "Проблемы с UX",
+        "detail": "Нет валидации вводимых данных, нет индикации загрузки, нет обработки некорректного ввода. Пользователь может ввести невалидные данные без предупреждения.",
+        "severity": "low"
+      },
+      {
+        "title": "Структурные проблемы",
+        "detail": "Код не разделен на модули, все в одном файле. Нет разделения логики и представления. Повторяющийся код при работе с элементами формы.",
+        "severity": "medium"
+      },
+      {
+        "title": "AI-генерация признаки",
+        "detail": "Слишком шаблонный нейминг (serializeForm, expbtn, impbtn), избыточные комментарии в стиле \"let space = 0\", логическая стерильность в обработке событий.",
+        "severity": "low"
+      }
+    ],
+    "recommendations": [
+      "Добавить README с описанием проекта и инструкцией по использованию",
+      "Разделить код на модули (отдельные файлы для логики, UI, утилит)",
+      "Добавить валидацию форм и обработку ошибок",
+      "Убрать неиспользуемый код и исправить фрагмент после expbtn",
+      "Добавить комментарии к сложным участкам кода",
+      "Оптимизировать именование переменных и функций"
+    ],
+    "detailed_analysis": [
+      "index.html содержит форму с полями для ввода данных пользователя, кнопки экспорта/импорта JSON, чекбоксы для фильтрации ключей. Структура понятная, но без CSS стилизована минимально.",
+      "script.js содержит основную логику. Проблема: код вне функций выполняется при загрузке. Фрагмент let copyOfCurUs = {...} после expbtn вызывает ошибку при отсутствии currentUser.",
+      "В serializeForm используется деструктуризация и Array.from, но нет проверки на null. При пустых полях может сломаться.",
+      "Обработка экспорта JSON через expbtn работает, но логика с problemFields избыточна и непонятна без документации.",
+      "impbtn реализует импорт, но нет проверки существования полей в parsed объекте, что может вызвать ошибку.",
+      "expkeys фильтрует ключи, но код дублирует логику из expbtn.",
+      "AI-сигналы: слишком академичный стиль, шаблонный нейминг, отсутствие \"ручной\" эволюции кода."
+    ],
+    "ai_detection_signals": [
+      "Слишком академичный стиль кода",
+      "Избыточные и очевидные комментарии",
+      "Шаблонный нейминг (serializeForm, expbtn, impbtn)",
+      "Логическая стерильность и повторы",
+      "Отсутствие следов живой разработки"
+    ],
+    "ai_probability_percent": 35,
+    "ai_rationale": [
+      "Код слишком идеально структурирован для учебного проекта, отсутствуют типичные ошибки новичка. Нейминг слишком шаблонный, логика слишком \"чистая\" без следов итеративной разработки. Однако есть явные признаки ручной работы - проблемы с обработкой ошибок, отсутствие документации, структурные недочеты."
+    ],
+    "overall_score_percent": 65
+  },
+  "error": "",
+  "usage": {
+    "prompt_tokens": 1519,
+    "completion_tokens": 992,
+    "cached_tokens": 0,
+    "total_tokens": 2511,
+    "estimated_cost_usd": 0.0
+  }
+}
