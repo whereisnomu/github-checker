@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 import requests
+from repo_research_runtime import build_repo_research
 
 if TYPE_CHECKING:
     from bot_runtime import Finding, ReviewResult, RepoSnapshot
@@ -390,6 +391,13 @@ def post_filter_ai_review(review: "ReviewResult", snapshot: "RepoSnapshot") -> "
             continue
         filtered_analysis.append(item)
 
+    filtered_rubric = []
+    for item in review.rubric_breakdown:
+        if drop_text_item(item):
+            removed_items += 1
+            continue
+        filtered_rubric.append(item)
+
     filtered_signals = []
     for item in review.ai_detection_signals:
         if drop_text_item(item):
@@ -427,6 +435,7 @@ def post_filter_ai_review(review: "ReviewResult", snapshot: "RepoSnapshot") -> "
         overall_score_percent=review.overall_score_percent,
         detailed_analysis=filtered_analysis[:6],
         ai_detection_signals=filtered_signals[:5],
+        rubric_breakdown=filtered_rubric[:6],
         reviewed_files=review.reviewed_files,
         assignment_summary=review.assignment_summary,
         assignment_findings=review.assignment_findings,
@@ -894,6 +903,7 @@ def merge_llm_with_heuristic(
     ai_rationale = sanitize_string_list(payload.get("ai_rationale"))
     detailed_analysis = sanitize_string_list(payload.get("detailed_analysis"))
     ai_detection_signals = sanitize_string_list(payload.get("ai_detection_signals"))
+    rubric_breakdown = sanitize_string_list(payload.get("rubric_breakdown")) or heuristic.rubric_breakdown
     reviewed_files = sanitize_string_list(payload.get("reviewed_files"))
     issues = sanitize_findings(payload.get("issues")) or heuristic.issues
     summary = sanitize_text(payload.get("summary")) or heuristic.summary
@@ -915,6 +925,7 @@ def merge_llm_with_heuristic(
         overall_score_percent=blended_score,
         detailed_analysis=detailed_analysis[:6],
         ai_detection_signals=ai_detection_signals[:5],
+        rubric_breakdown=rubric_breakdown[:6],
         reviewed_files=reviewed_files[:8],
         review_source=f"AI: {provider_key}",
         provider_attempts=attempts,
@@ -989,6 +1000,76 @@ def build_llm_prompt_v2(snapshot: "RepoSnapshot", max_prompt_chars: int) -> str:
     return trim_text(prompt, max_prompt_chars)
 
 
+def build_llm_prompt_v3(snapshot: "RepoSnapshot", max_prompt_chars: int) -> str:
+    readme = next((file for file in snapshot.files if file.path.split("/")[-1].lower() in {"readme.md", "readme.txt"}), None)
+    file_list_limit = int(os.getenv("AI_FILE_LIST_LIMIT", "80"))
+    file_list = "\n".join(f"- {file.path}" for file in snapshot.files[:file_list_limit])
+    research = build_repo_research(snapshot, reviewed_limit=int(os.getenv("AI_REVIEWED_FILES_LIMIT", "16")))
+    research_files = set(research.reviewed_files)
+    selected_files = [file for file in snapshot.files if file.path in research_files] or select_reviewed_files(snapshot)
+    budget_per_file = max(1200, max_prompt_chars // max(1, len(selected_files) + 8))
+    code_blocks = [
+        f"FILE: {file.path}\n```text\n{trim_text(file.content, budget_per_file)}\n```"
+        for file in selected_files[:16]
+    ]
+    research_block = research.to_prompt_block(max_chars=max(4000, max_prompt_chars // 2))
+    assignment_block = ""
+    assignment_text = getattr(snapshot, "assignment_text", "").strip()
+    if assignment_text:
+        assignment_block = (
+            f"\n\nASSIGNMENT_FILE: {getattr(snapshot, 'assignment_filename', 'uploaded-task')}\n"
+            f"ASSIGNMENT_TEXT:\n{trim_text(assignment_text, max(1200, max_prompt_chars // 3))}"
+        )
+    schema_fields = [
+        '"summary":"string"',
+        '"strengths":["string"]',
+        '"issues":[{"title":"string","detail":"string","severity":"low|medium|high"}]',
+        '"recommendations":["string"]',
+        '"detailed_analysis":["string"]',
+        '"rubric_breakdown":["string"]',
+        '"ai_detection_signals":["string"]',
+        '"ai_probability_percent":0',
+        '"ai_rationale":["string"]',
+        '"overall_score_percent":0',
+    ]
+    if assignment_text:
+        schema_fields.insert(7, '"assignment_summary":"string"')
+        schema_fields.insert(8, '"assignment_findings":["string"]')
+    schema = "{" + ",".join(schema_fields) + "}"
+
+    prompt = (
+        "Ты преподаватель программирования и проверяешь учебную работу студента по репозиторию. Дай строгую, но педагогичную обратную связь и оценивай проект именно как студенческую работу, а не как production-сервис.\n\n"
+        "Оцени проект по критериям, которые типичны для учебных программных работ:\n"
+        "- полнота и соответствие заданию;\n"
+        "- корректность решения и надежность;\n"
+        "- структура, декомпозиция и архитектурные решения;\n"
+        "- читаемость, стиль, нейминг и комментарии;\n"
+        "- тестируемость и проверяемость;\n"
+        "- документация, запуск и воспроизводимость.\n\n"
+        "Работай по фактам из файлов и исследовательской сводки ниже. Не выдумывай отсутствующие части кода, уязвимости или фичи. "
+        "Если в prompt какой-то кодовый фрагмент усечен, не делай вывод, что функция незавершена только из-за этого. "
+        "Если в репозитории нет явного браузерного фронтенда, не приписывай ему XSS, CSRF и похожие web-угрозы. "
+        "Не повторяй одну и ту же мысль в summary, issues, rubric и recommendations разными словами.\n\n"
+        "Для оценки вероятности AI используй только наблюдаемые признаки: слишком академичный стиль, избыточные очевидные комментарии, шаблонный или громоздкий нейминг, логическую стерильность, повторы, слабую обработку ошибок, отсутствие следов живой эволюции кода. Это эвристика, а не доказательство.\n\n"
+        "Результат должен быть информативным и неповторяющимся. В rubric_breakdown дай короткие выводы по критериям с привязкой к файлам и наблюдаемым признакам. "
+        "Не больше 3 сильных сторон, 5 проблем, 4 рекомендаций, 6 пунктов rubric_breakdown, 6 пунктов detailed_analysis и 5 AI-сигналов. "
+        "Верни только JSON без Markdown по схеме:\n"
+        f"{schema}\n\n"
+        f"REPO: {snapshot.owner}/{snapshot.name}\n"
+        f"DESCRIPTION: {snapshot.description or 'нет описания'}\n"
+        f"DEFAULT_BRANCH: {snapshot.default_branch}\n"
+        f"FILES_ANALYZED: {len(snapshot.files)}\n"
+        f"FILES_SKIPPED: {snapshot.skipped_files}\n\n"
+        "REVIEWED_FILES:\n" + "\n".join(f"- {file.path}" for file in selected_files) + "\n\n"
+        f"FILES:\n{file_list}\n\n"
+        f"{research_block}\n\n"
+        f"README:\n{trim_text(readme.content if readme else 'README отсутствует', max(2000, max_prompt_chars // 3))}\n\n"
+        f"CODE_SAMPLES:\n{'\n\n'.join(code_blocks)}"
+        f"{assignment_block}"
+    )
+    return trim_text(prompt, max_prompt_chars)
+
+
 def build_ai_review_result_v2(
     payload: dict[str, Any],
     provider_key: str,
@@ -1003,6 +1084,7 @@ def build_ai_review_result_v2(
     issues = sanitize_findings(payload.get("issues"))
     recommendations = sanitize_string_list(payload.get("recommendations"))
     ai_detection_signals = sanitize_string_list(payload.get("ai_detection_signals"))
+    rubric_breakdown = sanitize_string_list(payload.get("rubric_breakdown"))
     ai_rationale = sanitize_string_list(payload.get("ai_rationale")) or ai_detection_signals[:3]
     has_native_detailed_analysis = bool(detailed_analysis)
     has_native_recommendations = bool(recommendations)
@@ -1011,6 +1093,7 @@ def build_ai_review_result_v2(
     detailed_analysis = filter_bad_sentences(detailed_analysis)
     strengths = filter_bad_sentences(strengths)
     recommendations = filter_bad_sentences(recommendations)
+    rubric_breakdown = filter_bad_sentences(rubric_breakdown)
     ai_detection_signals = filter_bad_sentences(ai_detection_signals)
     ai_rationale = filter_bad_sentences(ai_rationale)
     issues = [
@@ -1039,6 +1122,9 @@ def build_ai_review_result_v2(
     if not ai_rationale:
         ai_rationale = ["AI-оценка построена по структуре проекта, стилю кода и выбранным признакам."]
 
+    if not rubric_breakdown:
+        rubric_breakdown = detailed_analysis[:4]
+
     raw_ai_probability = payload.get("ai_probability_percent")
     raw_overall_score = payload.get("overall_score_percent")
     inferred_ai_probability = infer_ai_probability_from_payload(payload)
@@ -1064,6 +1150,7 @@ def build_ai_review_result_v2(
         overall_score_percent=overall_score,
         detailed_analysis=detailed_analysis[:6],
         ai_detection_signals=ai_detection_signals[:5],
+        rubric_breakdown=rubric_breakdown[:6],
         reviewed_files=(sanitize_string_list(payload.get("reviewed_files")) or fallback_reviewed_files)[:8],
         assignment_summary=sanitize_text(payload.get("assignment_summary")),
         assignment_findings=sanitize_string_list(payload.get("assignment_findings"))[:5],
@@ -1528,7 +1615,7 @@ class BaseSmartReviewer:
 
     def review(self, snapshot: "RepoSnapshot", heuristic: "ReviewResult") -> "ReviewResult":
         configured = [provider for provider in self.providers if provider.is_configured()]
-        reviewed_files = [file.path for file in select_reviewed_files(snapshot)]
+        reviewed_files = build_repo_research(snapshot, reviewed_limit=int(os.getenv("AI_REVIEWED_FILES_LIMIT", "16"))).reviewed_files[:8]
         if not configured:
             heuristic.review_source = "Эвристика"
             heuristic.provider_attempts = ["AI-ключи не настроены"]
@@ -1536,7 +1623,7 @@ class BaseSmartReviewer:
             return heuristic
 
         policy = self.budget.get_policy()
-        prompt = build_llm_prompt_v2(snapshot, policy["max_prompt_chars"])
+        prompt = build_llm_prompt_v3(snapshot, policy["max_prompt_chars"])
         estimated_tokens = estimate_text_tokens(prompt)
 
         try:
@@ -1636,7 +1723,7 @@ class LegacySmartReviewer(BaseSmartReviewer):
         progress_callback: Callable[[str], None] | None = None,
     ) -> "ReviewResult":
         configured = [provider for provider in self.providers if provider.is_configured()]
-        reviewed_files = [file.path for file in select_reviewed_files(snapshot)]
+        reviewed_files = build_repo_research(snapshot, reviewed_limit=int(os.getenv("AI_REVIEWED_FILES_LIMIT", "16"))).reviewed_files[:8]
         if not configured:
             if progress_callback:
                 progress_callback("AI не настроен, поэтому проверяю проект локально.")
@@ -1646,7 +1733,7 @@ class LegacySmartReviewer(BaseSmartReviewer):
             return heuristic
 
         policy = self.budget.get_policy()
-        prompt = build_llm_prompt_v2(snapshot, policy["max_prompt_chars"])
+        prompt = build_llm_prompt_v3(snapshot, policy["max_prompt_chars"])
         estimated_tokens = estimate_text_tokens(prompt)
 
         try:
@@ -1751,7 +1838,7 @@ class SmartReviewer(BaseSmartReviewer):
         progress_callback: Callable[[str], None] | None = None,
     ) -> "ReviewResult":
         configured = [provider for provider in self.providers if provider.is_configured()]
-        reviewed_files = [file.path for file in select_reviewed_files(snapshot)]
+        reviewed_files = build_repo_research(snapshot, reviewed_limit=int(os.getenv("AI_REVIEWED_FILES_LIMIT", "16"))).reviewed_files[:8]
         if not configured:
             if progress_callback:
                 progress_callback("AI не настроен, поэтому проверяю проект локально.")
@@ -1761,7 +1848,7 @@ class SmartReviewer(BaseSmartReviewer):
             return heuristic
 
         policy = self.budget.get_policy()
-        prompt = build_llm_prompt_v2(snapshot, policy["max_prompt_chars"])
+        prompt = build_llm_prompt_v3(snapshot, policy["max_prompt_chars"])
         estimated_tokens = estimate_text_tokens(prompt)
 
         try:

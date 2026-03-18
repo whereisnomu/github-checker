@@ -35,6 +35,9 @@ def render_report_v2(snapshot: "RepoSnapshot", result: "ReviewResult") -> str:
     if result.detailed_analysis:
         parts.append("<b>Детальный разбор:</b>\n" + render_list(result.detailed_analysis))
 
+    if result.rubric_breakdown:
+        parts.append("<b>Оценка по критериям:</b>\n" + render_list(result.rubric_breakdown))
+
     parts.append("<b>Рекомендации:</b>\n" + render_list(result.recommendations))
     parts.append(
         "<b>Вероятность использования AI:</b> "

@@ -152,6 +152,7 @@ class ReviewResult:
     overall_score_percent: int
     detailed_analysis: list[str] = field(default_factory=list)
     ai_detection_signals: list[str] = field(default_factory=list)
+    rubric_breakdown: list[str] = field(default_factory=list)
     reviewed_files: list[str] = field(default_factory=list)
     assignment_summary: str = ""
     assignment_findings: list[str] = field(default_factory=list)
@@ -1560,6 +1561,7 @@ class RepositoryAnalyzer(BaseRepositoryAnalyzer):
         overall_score = super().score_project(strengths, issues, tests_count, readme)
         summary = self.build_summary_v2(snapshot, overall_score, issues, ai_probability, assignment_summary)
         detailed_analysis = self.build_detailed_analysis(snapshot, source_files, reviewed_files, patterns, tests_count, comment_ratio)
+        rubric_breakdown = self.build_rubric_breakdown(readme, tests_count, source_files, patterns, assignment_summary)
 
         return ReviewResult(
             summary=summary,
@@ -1571,6 +1573,7 @@ class RepositoryAnalyzer(BaseRepositoryAnalyzer):
             overall_score_percent=overall_score,
             detailed_analysis=detailed_analysis,
             ai_detection_signals=ai_signals,
+            rubric_breakdown=rubric_breakdown,
             reviewed_files=reviewed_files,
             assignment_summary=assignment_summary,
             assignment_findings=assignment_findings,
@@ -1828,6 +1831,29 @@ class RepositoryAnalyzer(BaseRepositoryAnalyzer):
         if int(patterns["repeated_blocks"]) >= 6:
             details.append("Повторяющиеся блоки намекают, что часть логики уже пора выносить в утилиты или отдельные сервисы.")
         return self.deduplicate_strings(details, 6)
+
+    def build_rubric_breakdown(
+        self,
+        readme: RepoFile | None,
+        tests_count: int,
+        source_files: list[RepoFile],
+        patterns: dict[str, object],
+        assignment_summary: str,
+    ) -> list[str]:
+        total_lines = sum(self.count_non_empty_lines(file.content) for file in source_files)
+        large_file_count = sum(1 for file in source_files if self.count_non_empty_lines(file.content) > 250)
+        error_signal = int(patterns["error_handling_hits"])
+        validation_signal = int(patterns["validation_hits"])
+        duplication_signal = int(patterns["repeated_blocks"])
+        criteria = [
+            f"Полнота решения: {'лучше' if total_lines >= 80 else 'слабее'}, потому что в проекте около {total_lines} непустых строк и {'есть' if assignment_summary else 'нет'} отдельное сравнение с ТЗ.",
+            f"Корректность и надежность: {'есть база' if error_signal >= 2 else 'есть риск'}, так как сигналов обработки ошибок найдено {error_signal}, сигналов валидации — {validation_signal}.",
+            f"Структура и декомпозиция: {'нормальная база' if large_file_count == 0 else 'перегружено'}, крупных файлов найдено {large_file_count}, повторяющихся блоков — {duplication_signal}.",
+            f"Читаемость и сопровождение: {'понятнее' if readme else 'хуже'}, README {'есть' if readme else 'нет'}, а архитектуру {'проще' if readme else 'сложнее'} восстанавливать по коду.",
+            f"Проверяемость: {'есть признаки тестирования' if tests_count else 'почти не читается'}, тестовых файлов найдено {tests_count}.",
+            f"Документация и запуск: {'лучше' if readme else 'слабее'}, потому что README {'помогает понять проект' if readme else 'отсутствует и не объясняет запуск'}."
+        ]
+        return self.deduplicate_strings(criteria, 6)
 
     def build_summary_v2(
         self,
